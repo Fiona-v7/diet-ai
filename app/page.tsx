@@ -1,0 +1,131 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import Dashboard from '@/components/Dashboard';
+
+interface Nutrition {
+  foodName: string;
+  calories: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+interface Meal extends Nutrition {}
+
+const defaultGoal = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
+
+export default function Home() {
+  const [dailyGoal, setDailyGoal] = useState(defaultGoal);
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // 首次加载时从 localStorage 读取数据
+  useEffect(() => {
+    const savedGoal = localStorage.getItem('diet-goal');
+    const savedMeals = localStorage.getItem('diet-meals');
+    if (savedGoal) setDailyGoal(JSON.parse(savedGoal));
+    if (savedMeals) setMeals(JSON.parse(savedMeals));
+  }, []);
+
+  // 每次数据变化时保存到 localStorage
+  useEffect(() => {
+    localStorage.setItem('diet-goal', JSON.stringify(dailyGoal));
+    localStorage.setItem('diet-meals', JSON.stringify(meals));
+  }, [dailyGoal, meals]);
+
+  // 计算当前已摄入的营养素
+  const currentIntake = meals.reduce(
+    (acc, meal) => ({
+      calories: acc.calories + meal.calories,
+      carbs: acc.carbs + meal.carbs,
+      protein: acc.protein + meal.protein,
+      fat: acc.fat + meal.fat,
+    }),
+    { calories: 0, carbs: 0, protein: 0, fat: 0 }
+  );
+
+  // 调用 AI 接口添加餐食
+  const addMeal = useCallback(async () => {
+    if (!description.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/analyze-food', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert('AI 分析失败: ' + data.error);
+        return;
+      }
+      const newMeal: Meal = {
+        foodName: data.foodName,
+        calories: data.calories,
+        carbs: data.carbs,
+        protein: data.protein,
+        fat: data.fat,
+      };
+      setMeals((prev) => [...prev, newMeal]);
+      setDescription('');
+      setShowModal(false);
+    } catch (error) {
+      alert('请求失败，请检查服务器是否运行');
+    } finally {
+      setLoading(false);
+    }
+  }, [description]);
+
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <Dashboard
+        dailyGoal={dailyGoal}
+        currentIntake={currentIntake}
+        meals={meals}
+      />
+
+      {/* 右下角悬浮“+”按钮 */}
+      <button
+        onClick={() => setShowModal(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-green-500 text-white rounded-full text-3xl shadow-lg flex items-center justify-center z-50 hover:bg-green-600"
+      >
+        +
+      </button>
+
+      {/* 模态框：输入食物描述 */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-80">
+            <h3 className="text-lg font-bold mb-4">添加一餐</h3>
+            <input
+              type="text"
+              placeholder="例如：一碗牛肉面"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full border p-2 rounded mb-4"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-gray-600"
+              >
+                取消
+              </button>
+              <button
+                onClick={addMeal}
+                disabled={loading}
+                className="px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50"
+              >
+                {loading ? '分析中...' : '确认'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
