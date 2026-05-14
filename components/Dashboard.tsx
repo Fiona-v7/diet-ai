@@ -10,7 +10,7 @@ interface NutritionData {
 }
 
 interface Meal {
-  name: string
+  foodName: string
   calories: number
   carbs: number
   protein: number
@@ -123,7 +123,7 @@ function MealItem({ meal }: { meal: Meal }) {
           <Flame className="h-5 w-5 text-green-600" />
         </div>
         <div>
-          <p className="font-medium text-gray-900">{meal.name}</p>
+          <p className="font-medium text-gray-900">{meal.foodName}</p>
           <p className="text-sm text-gray-500">
             碳水 {meal.carbs}g · 蛋白质 {meal.protein}g · 脂肪 {meal.fat}g
           </p>
@@ -190,8 +190,6 @@ export default function Dashboard({ dailyGoal, currentIntake, meals }: Dashboard
           )}
         </div>
       </div>
-
-      {/* 悬浮按钮已移至 page.tsx，这里不再需要 */}
     </div>
   )
 }
