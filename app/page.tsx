@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Dashboard from '@/components/Dashboard';
+import SettingsPage from '@/components/SettingsPage';
 
 interface Nutrition {
   foodName: string;
@@ -33,8 +34,9 @@ export default function Home() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState('');
-  const [mealTime, setMealTime] = useState('午餐');  // 新增：餐次选择
+  const [mealTime, setMealTime] = useState('午餐');  // 餐次选择
   const [loading, setLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);  // 控制设置页显示
 
   // 首次加载时从 localStorage 读取数据
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function Home() {
     localStorage.setItem('diet-meals', JSON.stringify(meals));
   }, [dailyGoal, meals]);
 
-  // 【关键修改】只汇总今天的记录
+  // 只汇总今天的记录
   const today = getToday();
   const todayMeals = meals.filter((m) => m.date === today);
   const currentIntake = todayMeals.reduce(
@@ -63,7 +65,7 @@ export default function Home() {
     { calories: 0, carbs: 0, protein: 0, fat: 0 }
   );
 
-  // 【关键修改】调用 AI 接口添加餐食，同时带上 date 和 mealTime
+  // 调用 AI 接口添加餐食，同时带上 date 和 mealTime
   const addMeal = useCallback(async () => {
     if (!description.trim()) return;
     setLoading(true);
@@ -97,17 +99,39 @@ export default function Home() {
     }
   }, [description, mealTime]);
 
+  // 如果正在显示设置页面，就渲染设置页
+  if (showSettings) {
+    return (
+      <SettingsPage
+        currentGoal={dailyGoal}
+        onSave={(newGoal) => setDailyGoal(newGoal)}
+        onClose={() => setShowSettings(false)}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
       <Dashboard
-  dailyGoal={dailyGoal}
-  currentIntake={currentIntake}
-  meals={todayMeals}
-  todayDate={today}   // 新增：传入今天日期
-/>
-  
+        dailyGoal={dailyGoal}
+        currentIntake={currentIntake}
+        meals={todayMeals}
+        todayDate={today}
+      />
 
-      {/* 右下角悬浮“+”按钮 */}
+      {/* 右上角设置按钮 */}
+      <button
+        onClick={() => setShowSettings(true)}
+        className="fixed top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center z-50 hover:bg-gray-50"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+        <span className="sr-only">设置</span>
+      </button>
+
+      {/* 右下角悬浮"+"按钮 */}
       <button
         onClick={() => setShowModal(true)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-green-500 text-white rounded-full text-3xl shadow-lg flex items-center justify-center z-50 hover:bg-green-600"
