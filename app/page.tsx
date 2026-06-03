@@ -14,9 +14,9 @@ interface Nutrition {
 
 // 餐食记录类型
 interface Meal extends Nutrition {
-  date: string;       // 格式 "2026-05-28"
-  mealTime: string;   // "早餐" | "午餐" | "晚餐" | "加餐"
-  emotion: string;    // 情绪标签
+  date: string;
+  mealTime: string;
+  emotion: string;
 }
 
 const defaultGoal = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
@@ -102,6 +102,23 @@ export default function Home() {
     }
   }, [description, mealTime, emotion]);
 
+  // 删除指定餐食记录
+  const deleteMeal = useCallback((index: number) => {
+    const todayMealToDelete = todayMeals[index];
+    if (!todayMealToDelete) return;
+    const actualIndex = meals.findIndex(
+      (m) => m.date === todayMealToDelete.date &&
+             m.mealTime === todayMealToDelete.mealTime &&
+             m.foodName === todayMealToDelete.foodName &&
+             m.calories === todayMealToDelete.calories
+    );
+    if (actualIndex !== -1) {
+      const newMeals = [...meals];
+      newMeals.splice(actualIndex, 1);
+      setMeals(newMeals);
+    }
+  }, [meals, todayMeals]);
+
   // 如果正在显示设置页面，就渲染设置页
   if (showSettings) {
     return (
@@ -120,6 +137,7 @@ export default function Home() {
         currentIntake={currentIntake}
         meals={todayMeals}
         todayDate={today}
+        onDelete={deleteMeal}
       />
 
       {/* 右上角设置按钮 */}

@@ -25,6 +25,7 @@ interface DashboardProps {
   currentIntake: NutritionData
   meals: Meal[]
   todayDate: string
+  onDelete: (index: number) => void
 }
 
 function CircularProgress({
@@ -119,7 +120,7 @@ function LinearProgress({
   )
 }
 
-function MealItem({ meal }: { meal: Meal }) {
+function MealItem({ meal, onDelete, index }: { meal: Meal; onDelete: (index: number) => void; index: number }) {
   const mealTimeColors: Record<string, string> = {
     '早餐': 'bg-yellow-100 text-yellow-700',
     '午餐': 'bg-orange-100 text-orange-700',
@@ -128,7 +129,7 @@ function MealItem({ meal }: { meal: Meal }) {
   }
 
   return (
-    <div className="border-0 bg-white shadow-sm rounded-lg p-4 flex items-center justify-between">
+    <div className="border-0 bg-white shadow-sm rounded-lg p-4 flex items-center justify-between group">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
           <Flame className="h-5 w-5 text-green-600" />
@@ -148,9 +149,26 @@ function MealItem({ meal }: { meal: Meal }) {
           </p>
         </div>
       </div>
-      <div className="text-right">
-        <p className="font-semibold text-gray-900">{meal.calories}</p>
-        <p className="text-xs text-gray-500">卡路里</p>
+      <div className="flex items-center gap-2">
+        <div className="text-right">
+          <p className="font-semibold text-gray-900">{meal.calories}</p>
+          <p className="text-xs text-gray-500">卡路里</p>
+        </div>
+        {/* 删除按钮 */}
+        <button
+          onClick={() => {
+            if (confirm('确定要删除这条记录吗？')) {
+              onDelete(index);
+            }
+          }}
+          className="text-gray-300 hover:text-red-500 transition-colors p-1"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          <span className="sr-only">删除</span>
+        </button>
       </div>
     </div>
   )
@@ -209,7 +227,7 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
   );
 }
 
-export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate }: DashboardProps) {
+export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, onDelete }: DashboardProps) {
   return (
     <div className="relative min-h-screen bg-gray-50 pb-24">
       {/* Header */}
@@ -257,7 +275,7 @@ export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate }
         <h2 className="mb-4 text-lg font-semibold text-gray-900">今日餐食</h2>
         <div className="space-y-3">
           {meals.length > 0 ? (
-            meals.map((meal, index) => <MealItem key={index} meal={meal} />)
+            meals.map((meal, index) => <MealItem key={index} meal={meal} onDelete={onDelete} index={index} />)
           ) : (
             <p className="py-8 text-center text-gray-500">暂无餐食记录</p>
           )}
