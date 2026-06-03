@@ -7,22 +7,22 @@ import HistoryPage from '@/components/HistoryPage';
 import AuthPage from '@/components/AuthPage';
 import { supabase } from '@/lib/supabase';
 
-interface Nutrition {
-  foodName: string;
+interface NutritionData {
   calories: number;
   carbs: number;
   protein: number;
   fat: number;
 }
 
-interface Meal extends Nutrition {
+interface Meal extends NutritionData {
   id?: number;
+  foodName: string;
   date: string;
   mealTime: string;
   emotion: string;
 }
 
-const defaultGoal = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
+const defaultGoal: NutritionData = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
 
 function getToday(): string {
   const d = new Date();
@@ -34,7 +34,7 @@ function getToday(): string {
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
-  const [dailyGoal, setDailyGoal] = useState(defaultGoal);
+  const [dailyGoal, setDailyGoal] = useState<NutritionData>(defaultGoal);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState('');
@@ -180,7 +180,7 @@ export default function Home() {
     setMeals((prev) => prev.filter((m) => m.id !== mealToDelete.id));
   }, [todayMeals]);
 
-  const saveGoal = useCallback(async (newGoal: Nutrition) => {
+  const saveGoal = useCallback(async (newGoal: NutritionData) => {
     setDailyGoal(newGoal);
     if (user) {
       await supabase.from('goals').upsert({
@@ -201,7 +201,6 @@ export default function Home() {
     setShowIntention(false);
   }, [today]);
 
-  // 未登录 → 显示登录页
   if (!user) {
     return <AuthPage />;
   }
