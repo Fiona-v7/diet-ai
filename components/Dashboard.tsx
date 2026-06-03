@@ -17,6 +17,7 @@ interface Meal {
   fat: number
   date: string
   mealTime: string
+  emotion: string
 }
 
 interface DashboardProps {
@@ -137,6 +138,9 @@ function MealItem({ meal }: { meal: Meal }) {
             <p className="font-medium text-gray-900">{meal.foodName}</p>
             <span className={`text-xs px-2 py-0.5 rounded-full ${mealTimeColors[meal.mealTime] || 'bg-gray-100 text-gray-600'}`}>
               {meal.mealTime}
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              {meal.emotion}
             </span>
           </div>
           <p className="text-sm text-gray-500">

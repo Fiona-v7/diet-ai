@@ -12,10 +12,11 @@ interface Nutrition {
   fat: number;
 }
 
-// 餐食记录类型：在原来基础上增加了 date 和 mealTime
+// 餐食记录类型
 interface Meal extends Nutrition {
   date: string;       // 格式 "2026-05-28"
   mealTime: string;   // "早餐" | "午餐" | "晚餐" | "加餐"
+  emotion: string;    // 情绪标签
 }
 
 const defaultGoal = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
@@ -34,9 +35,10 @@ export default function Home() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState('');
-  const [mealTime, setMealTime] = useState('午餐');  // 餐次选择
+  const [mealTime, setMealTime] = useState('午餐');
+  const [emotion, setEmotion] = useState('常规');
   const [loading, setLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);  // 控制设置页显示
+  const [showSettings, setShowSettings] = useState(false);
 
   // 首次加载时从 localStorage 读取数据
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function Home() {
     { calories: 0, carbs: 0, protein: 0, fat: 0 }
   );
 
-  // 调用 AI 接口添加餐食，同时带上 date 和 mealTime
+  // 调用 AI 接口添加餐食
   const addMeal = useCallback(async () => {
     if (!description.trim()) return;
     setLoading(true);
@@ -88,6 +90,7 @@ export default function Home() {
         fat: data.fat,
         date: getToday(),
         mealTime: mealTime,
+        emotion: emotion,
       };
       setMeals((prev) => [...prev, newMeal]);
       setDescription('');
@@ -97,7 +100,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [description, mealTime]);
+  }, [description, mealTime, emotion]);
 
   // 如果正在显示设置页面，就渲染设置页
   if (showSettings) {
@@ -139,7 +142,7 @@ export default function Home() {
         +
       </button>
 
-      {/* 模态框：输入食物描述 + 选择餐次 */}
+      {/* 模态框：输入食物描述 + 选择餐次 + 情绪标签 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-80">
@@ -157,6 +160,23 @@ export default function Home() {
                 <option value="午餐">午餐</option>
                 <option value="晚餐">晚餐</option>
                 <option value="加餐">加餐</option>
+              </select>
+            </div>
+
+            {/* 情绪选择 */}
+            <div className="mb-3">
+              <label className="text-sm text-gray-600 mb-1 block">此刻感受</label>
+              <select
+                value={emotion}
+                onChange={(e) => setEmotion(e.target.value)}
+                className="w-full border p-2 rounded"
+              >
+                <option value="真饿了">🟢 真饿了</option>
+                <option value="无聊">🟡 无聊</option>
+                <option value="焦虑">🔴 焦虑</option>
+                <option value="开心">🟠 开心</option>
+                <option value="社交">🔵 社交场合</option>
+                <option value="常规">⚪ 常规进食</option>
               </select>
             </div>
 
