@@ -10,10 +10,10 @@ interface NutritionData {
 }
 
 interface SettingsPageProps {
-  currentGoal: NutritionData
-  onSave: (goal: NutritionData) => void
-  onClose: () => void
-}
+    currentGoal: NutritionData
+    onSave: (goal: NutritionData) => void | Promise<void>
+    onClose: () => void
+  }
 
 export default function SettingsPage({ currentGoal, onSave, onClose }: SettingsPageProps) {
   const [calories, setCalories] = useState(currentGoal.calories.toString())
