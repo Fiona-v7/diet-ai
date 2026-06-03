@@ -184,6 +184,7 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
   const emotionalEating = (emotionCounts['无聊'] || 0) + (emotionCounts['焦虑'] || 0) + (emotionCounts['开心'] || 0);
   const realHunger = emotionCounts['真饿了'] || 0;
   const social = emotionCounts['社交'] || 0;
+  const allRealHunger = realHunger === total;
 
   let insight = '';
   let emoji = '';
@@ -192,19 +193,41 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
     return null;
   }
 
-  if (emotionalEating > realHunger && emotionalEating > total / 2) {
-    emoji = '🧘';
-    insight = `今天你有 ${emotionalEating} 次进食可能和情绪相关，而不是真的饿了。试试在想吃东西时停下来问问自己："我是饿了，还是想逃避什么？"`;
-  } else if (realHunger >= total / 2) {
+  // 全部是真饿了——最佳状态，特别表扬
+  if (allRealHunger) {
     emoji = '⭐';
-    insight = `今天 ${realHunger} 次进食是因为真的饿了——你的身体在按需索取，这是最好的状态。`;
-  } else if (social >= 2) {
-    emoji = '🎉';
-    insight = `今天有 ${social} 次社交场合的进食。社交是生活的重要部分，不用有负罪感。`;
-  } else {
-    emoji = '💪';
-    insight = '你今天在认真倾听自己的身体。保持觉察，就是最好的减脂状态。';
+    insight = '今天每一次进食都是因为身体真的需要。你让食物回归了它最本质的功能——这不需要"坚持"，这是一种很舒服的状态。';
   }
+  // 大部分是真饿了
+  else if (realHunger >= total / 2) {
+    emoji = '💚';
+    insight = `今天 ${realHunger} 次进食是因为真的饿了——你的身体在按需索取，你在认真倾听它。`;
+  }
+  // 情绪性进食占主导
+  else if (emotionalEating > realHunger && emotionalEating >= total / 2) {
+    emoji = '🧘';
+    insight = `今天有 ${emotionalEating} 次进食和情绪有关。这不是"意志力不够"，这可能是一个信号——你最近压力变大了。也许你需要的不是少吃，而是给自己找一个放松的方式。`;
+  }
+  // 社交场合为主
+  else if (social >= 2) {
+    emoji = '🎉';
+    insight = `今天有 ${social} 次社交场合的进食。和重要的人一起吃饭，是生活中很美好的部分。不用有负罪感，这不会影响你的长期目标。`;
+  }
+  // 混合状态
+  else {
+    emoji = '💪';
+    insight = '你今天在努力倾听自己的身体。保持这种觉察，本身就是最好的减脂状态。';
+  }
+
+  // 情绪标签颜色映射
+  const emotionColors: Record<string, string> = {
+    '真饿了': 'bg-green-100 text-green-700',
+    '常规': 'bg-blue-100 text-blue-700',
+    '开心': 'bg-orange-100 text-orange-700',
+    '社交': 'bg-purple-100 text-purple-700',
+    '无聊': 'bg-yellow-100 text-yellow-700',
+    '焦虑': 'bg-red-100 text-red-700',
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-5">
@@ -215,7 +238,7 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
           <p className="text-sm text-gray-600 leading-relaxed">{insight}</p>
           <div className="flex flex-wrap gap-2 mt-3">
             {Object.entries(emotionCounts).map(([emotion, count]) => (
-              <span key={emotion} className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+              <span key={emotion} className={`text-xs px-2 py-1 rounded-full ${emotionColors[emotion] || 'bg-gray-100 text-gray-600'}`}>
                 {emotion} ×{count}
               </span>
             ))}
