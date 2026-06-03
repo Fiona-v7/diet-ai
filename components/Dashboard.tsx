@@ -26,6 +26,7 @@ interface DashboardProps {
   meals: Meal[]
   todayDate: string
   onDelete: (index: number) => void
+  todayIntention: string
 }
 
 function CircularProgress({
@@ -154,7 +155,6 @@ function MealItem({ meal, onDelete, index }: { meal: Meal; onDelete: (index: num
           <p className="font-semibold text-gray-900">{meal.calories}</p>
           <p className="text-xs text-gray-500">卡路里</p>
         </div>
-        {/* 删除按钮 */}
         <button
           onClick={() => {
             if (confirm('确定要删除这条记录吗？')) {
@@ -174,7 +174,6 @@ function MealItem({ meal, onDelete, index }: { meal: Meal; onDelete: (index: num
   )
 }
 
-// 情绪统计与洞察组件
 function EmotionSummary({ meals }: { meals: Meal[] }) {
   const emotionCounts: Record<string, number> = {};
   meals.forEach((m) => {
@@ -224,16 +223,26 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, onDelete }: DashboardProps) {
+export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, onDelete, todayIntention }: DashboardProps) {
   return (
     <div className="relative min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
       <div className="bg-gradient-to-b from-green-50 to-gray-50 px-6 pb-8 pt-12">
         <h1 className="mb-1 text-center text-xl font-semibold text-gray-900">今日摄入</h1>
         <p className="mb-2 text-center text-sm text-gray-500">{todayDate}</p>
+        {todayIntention && (
+          <div className="flex justify-center mb-2">
+            <span className={`text-xs px-3 py-1 rounded-full ${
+              todayIntention === '严谨控制' ? 'bg-green-100 text-green-700' :
+              todayIntention === '社交放松' ? 'bg-purple-100 text-purple-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>
+              今日：{todayIntention}
+            </span>
+          </div>
+        )}
         <p className="mb-8 text-center text-sm text-gray-500">
           目标: {dailyGoal.calories} 卡路里
         </p>
@@ -243,7 +252,6 @@ export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, 
         </div>
       </div>
 
-      {/* Macro Progress Bars */}
       <div className="px-6 py-6">
         <div className="border-0 bg-white shadow-sm rounded-lg p-5 space-y-5">
           <LinearProgress
@@ -270,7 +278,6 @@ export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, 
         </div>
       </div>
 
-      {/* Meals List */}
       <div className="px-6">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">今日餐食</h2>
         <div className="space-y-3">
@@ -282,7 +289,6 @@ export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, 
         </div>
       </div>
 
-      {/* 今日心态小结 */}
       {meals.length > 0 && (
         <div className="px-6 mt-6">
           <EmotionSummary meals={meals} />

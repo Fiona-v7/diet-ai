@@ -39,6 +39,11 @@ export default function Home() {
   const [emotion, setEmotion] = useState('常规');
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [todayIntention, setTodayIntention] = useState<string>('');
+  const [showIntention, setShowIntention] = useState(false);
+
+  // 获取今天的日期
+  const today = getToday();
 
   // 首次加载时从 localStorage 读取数据
   useEffect(() => {
@@ -46,7 +51,15 @@ export default function Home() {
     const savedMeals = localStorage.getItem('diet-meals');
     if (savedGoal) setDailyGoal(JSON.parse(savedGoal));
     if (savedMeals) setMeals(JSON.parse(savedMeals));
-  }, []);
+
+    const savedIntention = localStorage.getItem('diet-intention');
+    const savedIntentionDate = localStorage.getItem('diet-intention-date');
+    if (savedIntention && savedIntentionDate === today) {
+      setTodayIntention(savedIntention);
+    } else {
+      setShowIntention(true);
+    }
+  }, [today]);
 
   // 每次数据变化时保存到 localStorage
   useEffect(() => {
@@ -55,7 +68,6 @@ export default function Home() {
   }, [dailyGoal, meals]);
 
   // 只汇总今天的记录
-  const today = getToday();
   const todayMeals = meals.filter((m) => m.date === today);
   const currentIntake = todayMeals.reduce(
     (acc, meal) => ({
@@ -88,7 +100,7 @@ export default function Home() {
         carbs: data.carbs,
         protein: data.protein,
         fat: data.fat,
-        date: getToday(),
+        date: today,
         mealTime: mealTime,
         emotion: emotion,
       };
@@ -100,7 +112,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [description, mealTime, emotion]);
+  }, [description, mealTime, emotion, today]);
 
   // 删除指定餐食记录
   const deleteMeal = useCallback((index: number) => {
@@ -118,6 +130,14 @@ export default function Home() {
       setMeals(newMeals);
     }
   }, [meals, todayMeals]);
+
+  // 保存今日进食意图
+  const saveIntention = useCallback((intention: string) => {
+    setTodayIntention(intention);
+    localStorage.setItem('diet-intention', intention);
+    localStorage.setItem('diet-intention-date', today);
+    setShowIntention(false);
+  }, [today]);
 
   // 如果正在显示设置页面，就渲染设置页
   if (showSettings) {
@@ -138,6 +158,7 @@ export default function Home() {
         meals={todayMeals}
         todayDate={today}
         onDelete={deleteMeal}
+        todayIntention={todayIntention}
       />
 
       {/* 右上角设置按钮 */}
@@ -166,7 +187,6 @@ export default function Home() {
           <div className="bg-white rounded-lg p-6 w-80">
             <h3 className="text-lg font-bold mb-4">添加一餐</h3>
 
-            {/* 餐次选择 */}
             <div className="mb-3">
               <label className="text-sm text-gray-600 mb-1 block">餐次</label>
               <select
@@ -181,7 +201,6 @@ export default function Home() {
               </select>
             </div>
 
-            {/* 情绪选择 */}
             <div className="mb-3">
               <label className="text-sm text-gray-600 mb-1 block">此刻感受</label>
               <select
@@ -198,7 +217,6 @@ export default function Home() {
               </select>
             </div>
 
-            {/* 食物描述输入 */}
             <input
               type="text"
               placeholder="例如：一碗牛肉面"
@@ -223,6 +241,50 @@ export default function Home() {
                 {loading ? '分析中...' : '确认'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 每日进食意图选择弹窗 */}
+      {showIntention && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-80">
+            <h3 className="text-lg font-bold mb-2 text-center">🌅 早上好</h3>
+            <p className="text-sm text-gray-500 mb-4 text-center">
+              今天你想怎么和食物相处？
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => saveIntention('严谨控制')}
+                className="w-full p-3 rounded-lg border-2 border-green-300 hover:bg-green-50 text-left"
+              >
+                <span className="text-lg mr-2">🎯</span>
+                <span className="font-semibold text-gray-900">严谨控制</span>
+                <p className="text-xs text-gray-500 mt-1">严格按目标执行，今天有重要计划</p>
+              </button>
+              <button
+                onClick={() => saveIntention('正常维持')}
+                className="w-full p-3 rounded-lg border-2 border-blue-300 hover:bg-blue-50 text-left"
+              >
+                <span className="text-lg mr-2">⚖️</span>
+                <span className="font-semibold text-gray-900">正常维持</span>
+                <p className="text-xs text-gray-500 mt-1">保持日常节奏，听从身体信号</p>
+              </button>
+              <button
+                onClick={() => saveIntention('社交放松')}
+                className="w-full p-3 rounded-lg border-2 border-purple-300 hover:bg-purple-50 text-left"
+              >
+                <span className="text-lg mr-2">🎉</span>
+                <span className="font-semibold text-gray-900">社交放松</span>
+                <p className="text-xs text-gray-500 mt-1">今天有饭局或聚会，放松享受</p>
+              </button>
+            </div>
+            <button
+              onClick={() => saveIntention('正常维持')}
+              className="w-full mt-3 text-sm text-gray-400 hover:text-gray-600"
+            >
+              跳过，默认正常维持
+            </button>
           </div>
         </div>
       )}
