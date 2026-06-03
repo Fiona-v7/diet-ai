@@ -156,6 +156,59 @@ function MealItem({ meal }: { meal: Meal }) {
   )
 }
 
+// 情绪统计与洞察组件
+function EmotionSummary({ meals }: { meals: Meal[] }) {
+  const emotionCounts: Record<string, number> = {};
+  meals.forEach((m) => {
+    emotionCounts[m.emotion] = (emotionCounts[m.emotion] || 0) + 1;
+  });
+
+  const total = meals.length;
+  const emotionalEating = (emotionCounts['无聊'] || 0) + (emotionCounts['焦虑'] || 0) + (emotionCounts['开心'] || 0);
+  const realHunger = emotionCounts['真饿了'] || 0;
+  const social = emotionCounts['社交'] || 0;
+
+  let insight = '';
+  let emoji = '';
+
+  if (total === 0) {
+    return null;
+  }
+
+  if (emotionalEating > realHunger && emotionalEating > total / 2) {
+    emoji = '🧘';
+    insight = `今天你有 ${emotionalEating} 次进食可能和情绪相关，而不是真的饿了。试试在想吃东西时停下来问问自己："我是饿了，还是想逃避什么？"`;
+  } else if (realHunger >= total / 2) {
+    emoji = '⭐';
+    insight = `今天 ${realHunger} 次进食是因为真的饿了——你的身体在按需索取，这是最好的状态。`;
+  } else if (social >= 2) {
+    emoji = '🎉';
+    insight = `今天有 ${social} 次社交场合的进食。社交是生活的重要部分，不用有负罪感。`;
+  } else {
+    emoji = '💪';
+    insight = '你今天在认真倾听自己的身体。保持觉察，就是最好的减脂状态。';
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-5">
+      <div className="flex items-start gap-3">
+        <span className="text-2xl">{emoji}</span>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">今日心态小结</h3>
+          <p className="text-sm text-gray-600 leading-relaxed">{insight}</p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {Object.entries(emotionCounts).map(([emotion, count]) => (
+              <span key={emotion} className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                {emotion} ×{count}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate }: DashboardProps) {
   return (
     <div className="relative min-h-screen bg-gray-50 pb-24">
@@ -210,6 +263,13 @@ export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate }
           )}
         </div>
       </div>
+
+      {/* 今日心态小结 */}
+      {meals.length > 0 && (
+        <div className="px-6 mt-6">
+          <EmotionSummary meals={meals} />
+        </div>
+      )}
     </div>
   )
 }
