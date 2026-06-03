@@ -40,6 +40,7 @@ export default function Home() {
   const [description, setDescription] = useState('');
   const [mealTime, setMealTime] = useState('午餐');
   const [emotion, setEmotion] = useState('常规');
+  const [imageBase64, setImageBase64] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -120,13 +121,13 @@ export default function Home() {
   );
 
   const addMeal = useCallback(async () => {
-    if (!description.trim() || !user) return;
+    if ((!description.trim() && !imageBase64) || !user) return;
     setLoading(true);
     try {
       const res = await fetch('/api/analyze-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description }),
+        body: JSON.stringify({ description, imageBase64 }),
       });
       const data = await res.json();
       if (data.error) {
@@ -161,13 +162,14 @@ export default function Home() {
       }
 
       setDescription('');
+      setImageBase64('');
       setShowModal(false);
     } catch (error) {
       alert('请求失败，请检查网络连接');
     } finally {
       setLoading(false);
     }
-  }, [description, mealTime, emotion, today, user]);
+  }, [description, mealTime, emotion, imageBase64, today, user]);
 
   const deleteMeal = useCallback(async (index: number) => {
     const mealToDelete = todayMeals[index];
@@ -268,7 +270,7 @@ export default function Home() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-80">
+          <div className="bg-white rounded-lg p-6 w-80 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">添加一餐</h3>
 
             <div className="mb-3">
@@ -293,9 +295,41 @@ export default function Home() {
               </select>
             </div>
 
+            {/* 图片上传 */}
+            <div className="mb-3">
+              <label className="text-sm text-gray-600 mb-1 block">拍照识别（可选）</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      setImageBase64(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                className="w-full text-sm text-gray-500"
+              />
+              {imageBase64 && (
+                <div className="mt-2 relative">
+                  <img src={imageBase64} alt="预览" className="w-full h-32 object-cover rounded" />
+                  <button
+                    onClick={() => setImageBase64('')}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+
             <input
               type="text"
-              placeholder="例如：一碗牛肉面"
+              placeholder="例如：一碗牛肉面（拍照后也可补充描述）"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full border p-2 rounded mb-4"
@@ -303,7 +337,7 @@ export default function Home() {
             />
 
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600">取消</button>
+              <button onClick={() => { setShowModal(false); setImageBase64(''); }} className="px-4 py-2 text-gray-600">取消</button>
               <button onClick={addMeal} disabled={loading} className="px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50">
                 {loading ? '分析中...' : '确认'}
               </button>

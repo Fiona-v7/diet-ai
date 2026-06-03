@@ -5,11 +5,11 @@ const MODEL = 'deepseek-chat';
 
 export async function POST(request: NextRequest) {
   try {
-    const { description } = await request.json();
+    const { description, imageBase64 } = await request.json();
 
-    if (!description || typeof description !== 'string') {
+    if ((!description || typeof description !== 'string') && !imageBase64) {
       return NextResponse.json(
-        { error: '请提供食物描述（description 字段）' },
+        { error: '请提供食物描述或图片' },
         { status: 400 }
       );
     }
@@ -22,6 +22,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 构建消息内容
+    const userContent: any[] = [];
+
+    if (imageBase64) {
+      userContent.push({
+        type: 'image_url',
+        image_url: {
+          url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`,
+        },
+      });
+    }
+
+    const textPrompt = description
+      ? `请分析以下食物描述的营养成分：${description}${imageBase64 ? '（参考图片）' : ''}`
+      : '请分析图片中的食物，估算其营养成分';
+
+    userContent.push({
+      type: 'text',
+      text: textPrompt,
+    });
+
     const response = await fetch(`${API_BASE}/v1/chat/completions`, {
       method: 'POST',
       headers: {
@@ -33,13 +54,13 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: `你是一个精确的营养师，专长是分析食物营养成分。你的任务是解析用户的任何描述（包括带克数的），并给出最精确的估算。
+            content: `你是一个精确的营养师，专长是分析食物营养成分。你的任务是解析用户提供的食物描述和/或图片，并给出最精确的估算。
 
 分析原则：
-1. 仔细拆解用户输入：识别出每种食物、具体分量（克、毫升、碗、个、杯等）和烹饪方式。
-2. 如果用户明确给出了克数或毫升数，请以用户给出的数值为准进行计算。例如"鸡胸肉200g"就按200g计算，每100g鸡胸肉约含热量110千卡、碳水0g、蛋白质23g、脂肪2g，按比例计算。
-3. 如果用户只描述了食物名称没有给份量（如"一碗牛肉面"），就按1人份的正常餐食估算。
-4. 如果用户输入了多种食物（如"米饭150g+鸡胸肉200g"），请分别计算每种食物的营养素，然后汇总总数。
+1. 如果有图片，先识别图片中的食物种类和大致分量。
+2. 如果用户同时提供了文字描述（如"鸡胸肉200g"），以文字描述为准，图片作为辅助参考。
+3. 如果只有图片，估算图片中食物的种类和分量（按正常一份估算）。
+4. 如果用户明确给出了克数或毫升数，请以用户给出的数值为准进行计算。
 5. 常见份量参考：
    - 1碗米饭约150g，热量约170千卡
    - 1碗面条约200g，热量约220千卡（不含汤料）
@@ -54,7 +75,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: 'user',
-            content: description,
+            content: userContent,
           },
         ],
         temperature: 0.3,
@@ -80,7 +101,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 解析 AI 返回的 JSON
     let cleaned = content.trim();
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '');
