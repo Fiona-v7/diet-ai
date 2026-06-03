@@ -116,6 +116,14 @@ function LinearProgress({
 }
 
 function MealItem({ meal }: { meal: Meal }) {
+  // 餐次对应的颜色标签
+  const mealTimeColors: Record<string, string> = {
+    '早餐': 'bg-yellow-100 text-yellow-700',
+    '午餐': 'bg-orange-100 text-orange-700',
+    '晚餐': 'bg-blue-100 text-blue-700',
+    '加餐': 'bg-purple-100 text-purple-700',
+  };
+
   return (
     <div className="border-0 bg-white shadow-sm rounded-lg p-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
@@ -123,7 +131,13 @@ function MealItem({ meal }: { meal: Meal }) {
           <Flame className="h-5 w-5 text-green-600" />
         </div>
         <div>
-          <p className="font-medium text-gray-900">{meal.foodName}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-gray-900">{meal.foodName}</p>
+            {/* 新增：餐次标签 */}
+            <span className={`text-xs px-2 py-0.5 rounded-full ${mealTimeColors[meal.mealTime] || 'bg-gray-100 text-gray-600'}`}>
+              {meal.mealTime}
+            </span>
+          </div>
           <p className="text-sm text-gray-500">
             碳水 {meal.carbs}g · 蛋白质 {meal.protein}g · 脂肪 {meal.fat}g
           </p>

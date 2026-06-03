@@ -11,15 +11,29 @@ interface Nutrition {
   fat: number;
 }
 
-interface Meal extends Nutrition {}
+// 餐食记录类型：在原来基础上增加了 date 和 mealTime
+interface Meal extends Nutrition {
+  date: string;       // 格式 "2026-05-28"
+  mealTime: string;   // "早餐" | "午餐" | "晚餐" | "加餐"
+}
 
 const defaultGoal = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
+
+// 获取今天的日期字符串
+function getToday(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export default function Home() {
   const [dailyGoal, setDailyGoal] = useState(defaultGoal);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState('');
+  const [mealTime, setMealTime] = useState('午餐');  // 新增：餐次选择
   const [loading, setLoading] = useState(false);
 
   // 首次加载时从 localStorage 读取数据
@@ -36,8 +50,10 @@ export default function Home() {
     localStorage.setItem('diet-meals', JSON.stringify(meals));
   }, [dailyGoal, meals]);
 
-  // 计算当前已摄入的营养素
-  const currentIntake = meals.reduce(
+  // 【关键修改】只汇总今天的记录
+  const today = getToday();
+  const todayMeals = meals.filter((m) => m.date === today);
+  const currentIntake = todayMeals.reduce(
     (acc, meal) => ({
       calories: acc.calories + meal.calories,
       carbs: acc.carbs + meal.carbs,
@@ -47,7 +63,7 @@ export default function Home() {
     { calories: 0, carbs: 0, protein: 0, fat: 0 }
   );
 
-  // 调用 AI 接口添加餐食
+  // 【关键修改】调用 AI 接口添加餐食，同时带上 date 和 mealTime
   const addMeal = useCallback(async () => {
     if (!description.trim()) return;
     setLoading(true);
@@ -68,6 +84,8 @@ export default function Home() {
         carbs: data.carbs,
         protein: data.protein,
         fat: data.fat,
+        date: getToday(),
+        mealTime: mealTime,
       };
       setMeals((prev) => [...prev, newMeal]);
       setDescription('');
@@ -77,14 +95,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [description]);
+  }, [description, mealTime]);
 
   return (
     <main className="min-h-screen bg-gray-50">
       <Dashboard
         dailyGoal={dailyGoal}
         currentIntake={currentIntake}
-        meals={meals}
+        meals={todayMeals}  // 只传今天的餐食
       />
 
       {/* 右下角悬浮“+”按钮 */}
@@ -95,11 +113,28 @@ export default function Home() {
         +
       </button>
 
-      {/* 模态框：输入食物描述 */}
+      {/* 模态框：输入食物描述 + 选择餐次 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-80">
             <h3 className="text-lg font-bold mb-4">添加一餐</h3>
+
+            {/* 餐次选择 */}
+            <div className="mb-3">
+              <label className="text-sm text-gray-600 mb-1 block">餐次</label>
+              <select
+                value={mealTime}
+                onChange={(e) => setMealTime(e.target.value)}
+                className="w-full border p-2 rounded"
+              >
+                <option value="早餐">早餐</option>
+                <option value="午餐">午餐</option>
+                <option value="晚餐">晚餐</option>
+                <option value="加餐">加餐</option>
+              </select>
+            </div>
+
+            {/* 食物描述输入 */}
             <input
               type="text"
               placeholder="例如：一碗牛肉面"
@@ -108,6 +143,7 @@ export default function Home() {
               className="w-full border p-2 rounded mb-4"
               autoFocus
             />
+
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowModal(false)}
