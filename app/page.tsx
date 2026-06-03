@@ -100,10 +100,12 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50">
       <Dashboard
-        dailyGoal={dailyGoal}
-        currentIntake={currentIntake}
-        meals={todayMeals}  // 只传今天的餐食
-      />
+  dailyGoal={dailyGoal}
+  currentIntake={currentIntake}
+  meals={todayMeals}
+  todayDate={today}   // 新增：传入今天日期
+/>
+  
 
       {/* 右下角悬浮“+”按钮 */}
       <button
