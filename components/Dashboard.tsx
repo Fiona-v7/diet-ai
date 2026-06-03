@@ -10,6 +10,7 @@ interface NutritionData {
 }
 
 interface Meal {
+  id?: number
   foodName: string
   calories: number
   carbs: number

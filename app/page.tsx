@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Dashboard from '@/components/Dashboard';
 import SettingsPage from '@/components/SettingsPage';
 import HistoryPage from '@/components/HistoryPage';
+import AuthPage from '@/components/AuthPage';
+import { supabase } from '@/lib/supabase';
 
 interface Nutrition {
   foodName: string;
@@ -13,8 +15,8 @@ interface Nutrition {
   fat: number;
 }
 
-// 餐食记录类型
 interface Meal extends Nutrition {
+  id?: number;
   date: string;
   mealTime: string;
   emotion: string;
@@ -22,7 +24,6 @@ interface Meal extends Nutrition {
 
 const defaultGoal = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
 
-// 获取今天的日期字符串
 function getToday(): string {
   const d = new Date();
   const year = d.getFullYear();
@@ -32,6 +33,7 @@ function getToday(): string {
 }
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null);
   const [dailyGoal, setDailyGoal] = useState(defaultGoal);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -44,15 +46,58 @@ export default function Home() {
   const [todayIntention, setTodayIntention] = useState<string>('');
   const [showIntention, setShowIntention] = useState(false);
 
-  // 获取今天的日期
   const today = getToday();
 
-  // 首次加载时从 localStorage 读取数据
+  // 检查登录状态
   useEffect(() => {
-    const savedGoal = localStorage.getItem('diet-goal');
-    const savedMeals = localStorage.getItem('diet-meals');
-    if (savedGoal) setDailyGoal(JSON.parse(savedGoal));
-    if (savedMeals) setMeals(JSON.parse(savedMeals));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 从云端加载数据
+  useEffect(() => {
+    if (!user) return;
+
+    const loadGoals = async () => {
+      const { data } = await supabase.from('goals').select('*').eq('user_id', user.id).single();
+      if (data) {
+        setDailyGoal({
+          calories: data.calories,
+          carbs: data.carbs,
+          protein: data.protein,
+          fat: data.fat,
+        });
+      }
+    };
+
+    const loadMeals = async () => {
+      const { data } = await supabase.from('meals').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (data) {
+        setMeals(
+          data.map((m: any) => ({
+            id: m.id,
+            foodName: m.food_name,
+            calories: m.calories,
+            carbs: m.carbs,
+            protein: m.protein,
+            fat: m.fat,
+            date: m.date,
+            mealTime: m.meal_time,
+            emotion: m.emotion,
+          }))
+        );
+      }
+    };
+
+    loadGoals();
+    loadMeals();
 
     const savedIntention = localStorage.getItem('diet-intention');
     const savedIntentionDate = localStorage.getItem('diet-intention-date');
@@ -61,15 +106,8 @@ export default function Home() {
     } else {
       setShowIntention(true);
     }
-  }, [today]);
+  }, [user, today]);
 
-  // 每次数据变化时保存到 localStorage
-  useEffect(() => {
-    localStorage.setItem('diet-goal', JSON.stringify(dailyGoal));
-    localStorage.setItem('diet-meals', JSON.stringify(meals));
-  }, [dailyGoal, meals]);
-
-  // 只汇总今天的记录
   const todayMeals = meals.filter((m) => m.date === today);
   const currentIntake = todayMeals.reduce(
     (acc, meal) => ({
@@ -81,9 +119,8 @@ export default function Home() {
     { calories: 0, carbs: 0, protein: 0, fat: 0 }
   );
 
-  // 调用 AI 接口添加餐食
   const addMeal = useCallback(async () => {
-    if (!description.trim()) return;
+    if (!description.trim() || !user) return;
     setLoading(true);
     try {
       const res = await fetch('/api/analyze-food', {
@@ -96,44 +133,67 @@ export default function Home() {
         alert('AI 分析失败: ' + data.error);
         return;
       }
-      const newMeal: Meal = {
-        foodName: data.foodName,
+
+      const { data: inserted } = await supabase.from('meals').insert({
+        user_id: user.id,
+        food_name: data.foodName,
         calories: data.calories,
         carbs: data.carbs,
         protein: data.protein,
         fat: data.fat,
         date: today,
-        mealTime: mealTime,
+        meal_time: mealTime,
         emotion: emotion,
-      };
-      setMeals((prev) => [...prev, newMeal]);
+      }).select().single();
+
+      if (inserted) {
+        setMeals((prev) => [{
+          id: inserted.id,
+          foodName: inserted.food_name,
+          calories: inserted.calories,
+          carbs: inserted.carbs,
+          protein: inserted.protein,
+          fat: inserted.fat,
+          date: inserted.date,
+          mealTime: inserted.meal_time,
+          emotion: inserted.emotion,
+        }, ...prev]);
+      }
+
       setDescription('');
       setShowModal(false);
     } catch (error) {
-      alert('请求失败，请检查服务器是否运行');
+      alert('请求失败，请检查网络连接');
     } finally {
       setLoading(false);
     }
-  }, [description, mealTime, emotion, today]);
+  }, [description, mealTime, emotion, today, user]);
 
-  // 删除指定餐食记录
-  const deleteMeal = useCallback((index: number) => {
-    const todayMealToDelete = todayMeals[index];
-    if (!todayMealToDelete) return;
-    const actualIndex = meals.findIndex(
-      (m) => m.date === todayMealToDelete.date &&
-             m.mealTime === todayMealToDelete.mealTime &&
-             m.foodName === todayMealToDelete.foodName &&
-             m.calories === todayMealToDelete.calories
-    );
-    if (actualIndex !== -1) {
-      const newMeals = [...meals];
-      newMeals.splice(actualIndex, 1);
-      setMeals(newMeals);
+  const deleteMeal = useCallback(async (index: number) => {
+    const mealToDelete = todayMeals[index];
+    if (!mealToDelete) return;
+
+    if (mealToDelete.id) {
+      await supabase.from('meals').delete().eq('id', mealToDelete.id);
     }
-  }, [meals, todayMeals]);
 
-  // 保存今日进食意图
+    setMeals((prev) => prev.filter((m) => m.id !== mealToDelete.id));
+  }, [todayMeals]);
+
+  const saveGoal = useCallback(async (newGoal: Nutrition) => {
+    setDailyGoal(newGoal);
+    if (user) {
+      await supabase.from('goals').upsert({
+        user_id: user.id,
+        calories: newGoal.calories,
+        carbs: newGoal.carbs,
+        protein: newGoal.protein,
+        fat: newGoal.fat,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }, [user]);
+
   const saveIntention = useCallback((intention: string) => {
     setTodayIntention(intention);
     localStorage.setItem('diet-intention', intention);
@@ -141,18 +201,21 @@ export default function Home() {
     setShowIntention(false);
   }, [today]);
 
-  // 如果正在显示设置页面
+  // 未登录 → 显示登录页
+  if (!user) {
+    return <AuthPage />;
+  }
+
   if (showSettings) {
     return (
       <SettingsPage
         currentGoal={dailyGoal}
-        onSave={(newGoal) => setDailyGoal(newGoal)}
+        onSave={saveGoal}
         onClose={() => setShowSettings(false)}
       />
     );
   }
 
-  // 如果正在显示历史页面
   if (showHistory) {
     return (
       <HistoryPage
@@ -173,7 +236,6 @@ export default function Home() {
         todayIntention={todayIntention}
       />
 
-      {/* 右上角历史按钮 */}
       <button
         onClick={() => setShowHistory(true)}
         className="fixed top-4 right-16 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center z-50 hover:bg-gray-50"
@@ -187,7 +249,6 @@ export default function Home() {
         <span className="sr-only">历史记录</span>
       </button>
 
-      {/* 右上角设置按钮 */}
       <button
         onClick={() => setShowSettings(true)}
         className="fixed top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center z-50 hover:bg-gray-50"
@@ -199,7 +260,6 @@ export default function Home() {
         <span className="sr-only">设置</span>
       </button>
 
-      {/* 右下角悬浮"+"按钮 */}
       <button
         onClick={() => setShowModal(true)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-green-500 text-white rounded-full text-3xl shadow-lg flex items-center justify-center z-50 hover:bg-green-600"
@@ -207,7 +267,6 @@ export default function Home() {
         +
       </button>
 
-      {/* 模态框：输入食物描述 + 选择餐次 + 情绪标签 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-80">
@@ -215,11 +274,7 @@ export default function Home() {
 
             <div className="mb-3">
               <label className="text-sm text-gray-600 mb-1 block">餐次</label>
-              <select
-                value={mealTime}
-                onChange={(e) => setMealTime(e.target.value)}
-                className="w-full border p-2 rounded"
-              >
+              <select value={mealTime} onChange={(e) => setMealTime(e.target.value)} className="w-full border p-2 rounded">
                 <option value="早餐">早餐</option>
                 <option value="午餐">午餐</option>
                 <option value="晚餐">晚餐</option>
@@ -229,11 +284,7 @@ export default function Home() {
 
             <div className="mb-3">
               <label className="text-sm text-gray-600 mb-1 block">此刻感受</label>
-              <select
-                value={emotion}
-                onChange={(e) => setEmotion(e.target.value)}
-                className="w-full border p-2 rounded"
-              >
+              <select value={emotion} onChange={(e) => setEmotion(e.target.value)} className="w-full border p-2 rounded">
                 <option value="真饿了">🟢 真饿了</option>
                 <option value="无聊">🟡 无聊</option>
                 <option value="焦虑">🔴 焦虑</option>
@@ -253,17 +304,8 @@ export default function Home() {
             />
 
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-gray-600"
-              >
-                取消
-              </button>
-              <button
-                onClick={addMeal}
-                disabled={loading}
-                className="px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50"
-              >
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600">取消</button>
+              <button onClick={addMeal} disabled={loading} className="px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50">
                 {loading ? '分析中...' : '确认'}
               </button>
             </div>
@@ -271,46 +313,29 @@ export default function Home() {
         </div>
       )}
 
-      {/* 每日进食意图选择弹窗 */}
       {showIntention && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-80">
             <h3 className="text-lg font-bold mb-2 text-center">🌅 早上好</h3>
-            <p className="text-sm text-gray-500 mb-4 text-center">
-              今天你想怎么和食物相处？
-            </p>
+            <p className="text-sm text-gray-500 mb-4 text-center">今天你想怎么和食物相处？</p>
             <div className="space-y-3">
-              <button
-                onClick={() => saveIntention('严谨控制')}
-                className="w-full p-3 rounded-lg border-2 border-green-300 hover:bg-green-50 text-left"
-              >
+              <button onClick={() => saveIntention('严谨控制')} className="w-full p-3 rounded-lg border-2 border-green-300 hover:bg-green-50 text-left">
                 <span className="text-lg mr-2">🎯</span>
                 <span className="font-semibold text-gray-900">严谨控制</span>
-                <p className="text-xs text-gray-500 mt-1">严格按目标执行，今天有重要计划</p>
+                <p className="text-xs text-gray-500 mt-1">严格按目标执行</p>
               </button>
-              <button
-                onClick={() => saveIntention('正常维持')}
-                className="w-full p-3 rounded-lg border-2 border-blue-300 hover:bg-blue-50 text-left"
-              >
+              <button onClick={() => saveIntention('正常维持')} className="w-full p-3 rounded-lg border-2 border-blue-300 hover:bg-blue-50 text-left">
                 <span className="text-lg mr-2">⚖️</span>
                 <span className="font-semibold text-gray-900">正常维持</span>
-                <p className="text-xs text-gray-500 mt-1">保持日常节奏，听从身体信号</p>
+                <p className="text-xs text-gray-500 mt-1">保持日常节奏</p>
               </button>
-              <button
-                onClick={() => saveIntention('社交放松')}
-                className="w-full p-3 rounded-lg border-2 border-purple-300 hover:bg-purple-50 text-left"
-              >
+              <button onClick={() => saveIntention('社交放松')} className="w-full p-3 rounded-lg border-2 border-purple-300 hover:bg-purple-50 text-left">
                 <span className="text-lg mr-2">🎉</span>
                 <span className="font-semibold text-gray-900">社交放松</span>
-                <p className="text-xs text-gray-500 mt-1">今天有饭局或聚会，放松享受</p>
+                <p className="text-xs text-gray-500 mt-1">今天有饭局或聚会</p>
               </button>
             </div>
-            <button
-              onClick={() => saveIntention('正常维持')}
-              className="w-full mt-3 text-sm text-gray-400 hover:text-gray-600"
-            >
-              跳过，默认正常维持
-            </button>
+            <button onClick={() => saveIntention('正常维持')} className="w-full mt-3 text-sm text-gray-400 hover:text-gray-600">跳过</button>
           </div>
         </div>
       )}
