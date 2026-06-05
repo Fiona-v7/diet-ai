@@ -16,6 +16,9 @@ interface Meal {
   carbs: number
   protein: number
   fat: number
+  sodium: number
+  fiber: number
+  sugar: number
   date: string
   mealTime: string
   emotion: string
@@ -28,6 +31,8 @@ interface DashboardProps {
   todayDate: string
   onDelete: (index: number) => void
   todayIntention: string
+  aiInsight: string
+  photoBase64: string
 }
 
 function CircularProgress({
@@ -132,29 +137,41 @@ function MealItem({ meal, onDelete, index }: { meal: Meal; onDelete: (index: num
 
   return (
     <div className="border-0 bg-white shadow-sm rounded-lg p-4 flex items-center justify-between group">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 flex-shrink-0">
           <Flame className="h-5 w-5 text-green-600" />
         </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="font-medium text-gray-900">{meal.foodName}</p>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${mealTimeColors[meal.mealTime] || 'bg-gray-100 text-gray-600'}`}>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-medium text-gray-900 truncate">{meal.foodName}</p>
+            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${mealTimeColors[meal.mealTime] || 'bg-gray-100 text-gray-600'}`}>
               {meal.mealTime}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+            <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-100 text-gray-600">
               {meal.emotion}
             </span>
           </div>
           <p className="text-sm text-gray-500">
             碳水 {meal.carbs}g · 蛋白质 {meal.protein}g · 脂肪 {meal.fat}g
           </p>
+          {/* 额外指标 */}
+          <div className="flex items-center gap-3 mt-1">
+            {meal.sodium > 0 && (
+              <span className="text-xs text-gray-400">钠 {meal.sodium}mg</span>
+            )}
+            {meal.fiber > 0 && (
+              <span className="text-xs text-gray-400">纤维 {meal.fiber}g</span>
+            )}
+            {meal.sugar > 0 && (
+              <span className="text-xs text-gray-400">糖 {meal.sugar}g</span>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-shrink-0">
         <div className="text-right">
           <p className="font-semibold text-gray-900">{meal.calories}</p>
-          <p className="text-xs text-gray-500">卡路里</p>
+          <p className="text-xs text-gray-500">千卡</p>
         </div>
         <button
           onClick={() => {
@@ -175,7 +192,7 @@ function MealItem({ meal, onDelete, index }: { meal: Meal; onDelete: (index: num
   )
 }
 
-function EmotionSummary({ meals }: { meals: Meal[] }) {
+function EmotionSummary({ meals, aiInsight }: { meals: Meal[]; aiInsight: string }) {
   const emotionCounts: Record<string, number> = {};
   meals.forEach((m) => {
     emotionCounts[m.emotion] = (emotionCounts[m.emotion] || 0) + 1;
@@ -194,33 +211,23 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
     return null;
   }
 
-  // 全部是真饿了——最佳状态，特别表扬
   if (allRealHunger) {
     emoji = '⭐';
     insight = '今天每一次进食都是因为身体真的需要。你让食物回归了它最本质的功能——这不需要"坚持"，这是一种很舒服的状态。';
-  }
-  // 大部分是真饿了
-  else if (realHunger >= total / 2) {
+  } else if (realHunger >= total / 2) {
     emoji = '💚';
     insight = `今天 ${realHunger} 次进食是因为真的饿了——你的身体在按需索取，你在认真倾听它。`;
-  }
-  // 情绪性进食占主导
-  else if (emotionalEating > realHunger && emotionalEating >= total / 2) {
+  } else if (emotionalEating > realHunger && emotionalEating >= total / 2) {
     emoji = '🧘';
     insight = `今天有 ${emotionalEating} 次进食和情绪有关。这不是"意志力不够"，这可能是一个信号——你最近压力变大了。也许你需要的不是少吃，而是给自己找一个放松的方式。`;
-  }
-  // 社交场合为主
-  else if (social >= 2) {
+  } else if (social >= 2) {
     emoji = '🎉';
     insight = `今天有 ${social} 次社交场合的进食。和重要的人一起吃饭，是生活中很美好的部分。不用有负罪感，这不会影响你的长期目标。`;
-  }
-  // 混合状态
-  else {
+  } else {
     emoji = '💪';
     insight = '你今天在努力倾听自己的身体。保持这种觉察，本身就是最好的减脂状态。';
   }
 
-  // 情绪标签颜色映射
   const emotionColors: Record<string, string> = {
     '真饿了': 'bg-green-100 text-green-700',
     '常规': 'bg-blue-100 text-blue-700',
@@ -234,7 +241,7 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
     <div className="bg-white rounded-lg shadow-sm p-5">
       <div className="flex items-start gap-3">
         <span className="text-2xl">{emoji}</span>
-        <div>
+        <div className="flex-1">
           <h3 className="text-sm font-semibold text-gray-900 mb-1">今日心态小结</h3>
           <p className="text-sm text-gray-600 leading-relaxed">{insight}</p>
           <div className="flex flex-wrap gap-2 mt-3">
@@ -244,16 +251,65 @@ function EmotionSummary({ meals }: { meals: Meal[] }) {
               </span>
             ))}
           </div>
+          {aiInsight && (
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="flex items-start gap-2">
+                <span className="text-sm mt-0.5 flex-shrink-0">🤖</span>
+                <p className="text-sm text-gray-500 italic leading-relaxed break-words">{aiInsight}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, onDelete, todayIntention }: DashboardProps) {
+function MiniAvatar({ photoBase64, intakeRatio }: { photoBase64: string; intakeRatio: number }) {
+  let ringColor = 'ring-green-300';
+  let bgGlow = 'shadow-green-200';
+  let emoji = '😊';
+
+  if (intakeRatio <= 0.8) {
+    ringColor = 'ring-green-300';
+    bgGlow = 'shadow-green-200';
+    emoji = '😊';
+  } else if (intakeRatio <= 1.0) {
+    ringColor = 'ring-yellow-400';
+    bgGlow = 'shadow-yellow-200';
+    emoji = '😐';
+  } else {
+    ringColor = 'ring-red-400';
+    bgGlow = 'shadow-red-200';
+    emoji = '😅';
+  }
+
+  return (
+    <div className="relative inline-block">
+      <div className={`absolute -inset-3 rounded-full ring-4 ${ringColor} shadow-lg ${bgGlow} animate-pulse`} />
+      <div className={`relative w-16 h-16 rounded-full ring-4 ${ringColor} overflow-hidden bg-white`}>
+        {photoBase64 ? (
+          <img src={photoBase64} alt="减脂小人" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-3xl">
+            🥗
+          </div>
+        )}
+      </div>
+      <span className="absolute -bottom-1 -right-1 text-lg">{emoji}</span>
+    </div>
+  );
+}
+
+export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, onDelete, todayIntention, aiInsight, photoBase64 }: DashboardProps) {
+  const intakeRatio = dailyGoal.calories > 0 ? currentIntake.calories / dailyGoal.calories : 0;
+
   return (
     <div className="relative min-h-screen bg-gray-50 pb-24">
       <div className="bg-gradient-to-b from-green-50 to-gray-50 px-6 pb-8 pt-12">
+        <div className="flex justify-center mb-4">
+          <MiniAvatar photoBase64={photoBase64} intakeRatio={intakeRatio} />
+        </div>
         <h1 className="mb-1 text-center text-xl font-semibold text-gray-900">今日摄入</h1>
         <p className="mb-2 text-center text-sm text-gray-500">{todayDate}</p>
         {todayIntention && (
@@ -315,7 +371,7 @@ export default function Dashboard({ dailyGoal, currentIntake, meals, todayDate, 
 
       {meals.length > 0 && (
         <div className="px-6 mt-6">
-          <EmotionSummary meals={meals} />
+          <EmotionSummary meals={meals} aiInsight={aiInsight} />
         </div>
       )}
     </div>

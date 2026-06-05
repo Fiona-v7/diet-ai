@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 构建消息内容
     const userContent: any[] = [];
 
     if (imageBase64) {
@@ -54,23 +53,27 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: `你是一个精确的营养师，专长是分析食物营养成分。你的任务是解析用户提供的食物描述和/或图片，并给出最精确的估算。
+            content: `你是一个精确的营养师，专长是分析食物营养成分。请解析用户提供的食物描述和/或图片，并给出最精确的估算。
 
 分析原则：
-1. 如果有图片，先识别图片中的食物种类和大致分量。
-2. 如果用户同时提供了文字描述（如"鸡胸肉200g"），以文字描述为准，图片作为辅助参考。
-3. 如果只有图片，估算图片中食物的种类和分量（按正常一份估算）。
-4. 如果用户明确给出了克数或毫升数，请以用户给出的数值为准进行计算。
-5. 常见份量参考：
+1. 仔细拆解用户输入：识别出每种食物、具体分量和烹饪方式。
+2. 如果用户明确给出了克数或毫升数，以用户给出的数值为准。
+3. 如果只有图片，估算图片中食物的种类和分量。
+4. 常见份量参考：
    - 1碗米饭约150g，热量约170千卡
    - 1碗面条约200g，热量约220千卡（不含汤料）
    - 1个鸡蛋约50g，热量约70千卡
    - 1片吐司约30g，热量约80千卡
    - 1杯牛奶约250ml，热量约120千卡
-6. 对于加工食品（如炸鸡、蛋糕），需考虑烹饪用油和调料的热量。
+5. 加工食品需考虑烹饪用油和调料的热量及钠含量。
+
+额外指标估算：
+- sodium（钠，mg）：加工食品、调味料、酱汁等钠含量较高。新鲜食材钠含量极低。
+- fiber（膳食纤维，g）：全谷物、蔬菜、水果、豆类含量较高。动物性食物含量为0。
+- sugar（糖，g）：估算总糖含量，包括天然糖和添加糖。
 
 只返回一个合法的JSON对象，格式为：
-{"foodName":"食物名称","calories":总热量,"carbs":总碳水,"protein":总蛋白质,"fat":总脂肪}
+{"foodName":"食物名称","calories":总热量,"carbs":总碳水,"protein":总蛋白质,"fat":总脂肪,"sodium":钠mg,"fiber":膳食纤维g,"sugar":糖g}
 不要任何解释、分析步骤或多余文本。`,
           },
           {
@@ -114,6 +117,9 @@ export async function POST(request: NextRequest) {
       carbs: Number(parsed.carbs) || 0,
       protein: Number(parsed.protein) || 0,
       fat: Number(parsed.fat) || 0,
+      sodium: Number(parsed.sodium) || 0,
+      fiber: Number(parsed.fiber) || 0,
+      sugar: Number(parsed.sugar) || 0,
     });
   } catch (error: any) {
     console.error('Analyze food error:', error);

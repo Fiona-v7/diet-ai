@@ -20,6 +20,9 @@ interface Meal extends NutritionData {
   date: string;
   mealTime: string;
   emotion: string;
+  sodium: number;
+  fiber: number;
+  sugar: number;
 }
 
 const defaultGoal: NutritionData = { calories: 2000, carbs: 200, protein: 100, fat: 60 };
@@ -41,15 +44,17 @@ export default function Home() {
   const [mealTime, setMealTime] = useState('午餐');
   const [emotion, setEmotion] = useState('常规');
   const [imageBase64, setImageBase64] = useState<string>('');
+  const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [todayIntention, setTodayIntention] = useState<string>('');
   const [showIntention, setShowIntention] = useState(false);
+  const [aiInsight, setAiInsight] = useState<string>('');
+  const [photoBase64, setPhotoBase64] = useState<string>('');
 
   const today = getToday();
 
-  // 检查登录状态
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -62,7 +67,6 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 从云端加载数据
   useEffect(() => {
     if (!user) return;
 
@@ -89,6 +93,9 @@ export default function Home() {
             carbs: m.carbs,
             protein: m.protein,
             fat: m.fat,
+            sodium: m.sodium || 0,
+            fiber: m.fiber || 0,
+            sugar: m.sugar || 0,
             date: m.date,
             mealTime: m.meal_time,
             emotion: m.emotion,
@@ -99,6 +106,9 @@ export default function Home() {
 
     loadGoals();
     loadMeals();
+
+    const savedPhoto = localStorage.getItem('diet-photo');
+    if (savedPhoto) setPhotoBase64(savedPhoto);
 
     const savedIntention = localStorage.getItem('diet-intention');
     const savedIntentionDate = localStorage.getItem('diet-intention-date');
@@ -119,6 +129,52 @@ export default function Home() {
     }),
     { calories: 0, carbs: 0, protein: 0, fat: 0 }
   );
+
+  const fetchAIInsight = useCallback(async () => {
+    if (todayMeals.length === 0) return;
+    const emotions = todayMeals.map(m => m.emotion);
+    try {
+      const res = await fetch('/api/daily-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emotions, intention: todayIntention }),
+      });
+      const data = await res.json();
+      if (data.insight) setAiInsight(data.insight);
+    } catch {}
+  }, [todayMeals, todayIntention]);
+
+  useEffect(() => {
+    if (user && todayMeals.length > 0) {
+      fetchAIInsight();
+    }
+  }, [todayMeals.length, user]);
+
+  // 语音识别
+  const startListening = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('你的浏览器不支持语音识别，请用 Chrome 或手动输入');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setDescription((prev) => prev + transcript);
+      setIsListening(false);
+    };
+
+    recognition.start();
+  }, []);
 
   const addMeal = useCallback(async () => {
     if ((!description.trim() && !imageBase64) || !user) return;
@@ -142,6 +198,9 @@ export default function Home() {
         carbs: data.carbs,
         protein: data.protein,
         fat: data.fat,
+        sodium: data.sodium || 0,
+        fiber: data.fiber || 0,
+        sugar: data.sugar || 0,
         date: today,
         meal_time: mealTime,
         emotion: emotion,
@@ -155,6 +214,9 @@ export default function Home() {
           carbs: inserted.carbs,
           protein: inserted.protein,
           fat: inserted.fat,
+          sodium: inserted.sodium || 0,
+          fiber: inserted.fiber || 0,
+          sugar: inserted.sugar || 0,
           date: inserted.date,
           mealTime: inserted.meal_time,
           emotion: inserted.emotion,
@@ -196,6 +258,15 @@ export default function Home() {
     }
   }, [user]);
 
+  const handlePhotoChange = useCallback((photo: string) => {
+    setPhotoBase64(photo);
+    if (photo) {
+      localStorage.setItem('diet-photo', photo);
+    } else {
+      localStorage.removeItem('diet-photo');
+    }
+  }, []);
+
   const saveIntention = useCallback((intention: string) => {
     setTodayIntention(intention);
     localStorage.setItem('diet-intention', intention);
@@ -211,7 +282,9 @@ export default function Home() {
     return (
       <SettingsPage
         currentGoal={dailyGoal}
+        photoBase64={photoBase64}
         onSave={saveGoal}
+        onPhotoChange={handlePhotoChange}
         onClose={() => setShowSettings(false)}
       />
     );
@@ -235,6 +308,8 @@ export default function Home() {
         todayDate={today}
         onDelete={deleteMeal}
         todayIntention={todayIntention}
+        aiInsight={aiInsight}
+        photoBase64={photoBase64}
       />
 
       <button
@@ -295,7 +370,6 @@ export default function Home() {
               </select>
             </div>
 
-            {/* 图片上传 */}
             <div className="mb-3">
               <label className="text-sm text-gray-600 mb-1 block">拍照识别（可选）</label>
               <input
@@ -327,16 +401,32 @@ export default function Home() {
               )}
             </div>
 
-            <input
-              type="text"
-              placeholder="例如：一碗牛肉面（拍照后也可补充描述）"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full border p-2 rounded mb-4"
-              autoFocus
-            />
+            <div className="mb-3 relative">
+              <label className="text-sm text-gray-600 mb-1 block">食物描述</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="例如：一碗牛肉面"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="flex-1 border p-2 rounded"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={startListening}
+                  disabled={isListening}
+                  className={`px-3 py-2 rounded text-white flex-shrink-0 ${isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-500 hover:bg-blue-600'}`}
+                >
+                  {isListening ? '🔴' : '🎤'}
+                </button>
+              </div>
+              {isListening && (
+                <p className="text-xs text-red-500 mt-1">正在聆听...</p>
+              )}
+            </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => { setShowModal(false); setImageBase64(''); }} className="px-4 py-2 text-gray-600">取消</button>
               <button onClick={addMeal} disabled={loading} className="px-4 py-2 bg-green-500 text-white rounded disabled:opacity-50">
                 {loading ? '分析中...' : '确认'}
